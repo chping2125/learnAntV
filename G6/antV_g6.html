@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en" style="overflow: scroll;">
+<head>
+    <meta charset="UTF-8">
+    <title>网图编辑器（默认）</title>
+    <link rel="stylesheet" type="text/css" href="https://gw.alipayobjects.com/as/g/datavis/assets/1.0.7/katex-0.8.3/katex.min.css" />
+    <style>::-webkit-scrollbar{display:none;}html,body{overflow:hidden;}</style>
+</head>
+<body style="overflow: scroll;">
+<div id="mountNode">
+  <div id="toolBar" style="position: absolute;z-index: 10"></div>
+  <button id="addCustom2">开始</button>
+  <button id="addCustom4">结束</button>
+  <button id="addCustom1">填写提交流程</button>
+  <button id="addCustom5">审批操作</button>
+  <button id="addCustom3">分支</button>
+  <button id="addCustom6">并行1</button>
+  <button id="addCustom7">并行2</button>
+  <button id="addLine">添加直线</button>
+  <button id="addLineHV">添加HV</button>
+  <button id="addLineVH">添加VH</button>
+  <button id="addLineVHV">添加VHV</button>
+  <button id="addLineHVH">添加HVH</button>
+  <button id="addPolyLineFlow">添加折线</button>
+  <!-- <button id="addSmooth">添加曲线</button> -->
+  <button id="drag">拖拽模式</button>
+  <button id="edit">编辑模式</button>
+  <button id="save">保存</button>
+</div>
+<br/>
+<br/>
+<br/>
+
+<div id="showNode"></div>
+
+<style type="text/css">
+  .customLine3 {
+    width: 100px;
+    height: 12px;
+    padding: 1px;
+    margin-top: -1px;
+    margin-left: -1px;
+    background-color: #fff !important;
+    border: 2px #6392e8 solid;
+    border-left: 0;
+    border-right: 0;
+  }  
+  .customLine4 {
+    width: 12px;
+    height: 100px;
+    padding: 1px;
+    margin-top: -1px;
+    margin-left: -1px;
+    background-color: #fff !important;
+    border: 2px #6392e8 solid;
+    border-top: 0;
+    border-bottom: 0;
+  }
+</style>
+
+<script>/*Fixing iframe window.innerHeight 0 issue in Safari*/document.body.clientHeight;</script>
+<script src="https://gw.alipayobjects.com/as/g/datavis/g6/1.2.0/g6.min.js"></script>
+<script src="https://gw.alipayobjects.com/as/g/datavis/g6-plugins/1.0.0/g6-plugins.min.js"></script>
+<script type="text/javascript">
+
+
+const addCustom1 = document.querySelector('#addCustom1');
+const addCustom2 = document.querySelector('#addCustom2');
+const addCustom4 = document.querySelector('#addCustom4');
+const addCustom3 = document.querySelector('#addCustom3');
+const addCustom5 = document.querySelector('#addCustom5');
+const addCustom6 = document.querySelector('#addCustom6');
+const addCustom7 = document.querySelector('#addCustom7');
+const drag = document.querySelector('#drag');
+const edit = document.querySelector('#edit');
+const addLine = document.querySelector('#addLine');
+const addLineHV = document.querySelector('#addLineHV');
+const addLineVH = document.querySelector('#addLineVH');
+const addLineVHV = document.querySelector('#addLineVHV');
+const addLineHVH = document.querySelector('#addLineHVH');
+const addPolyLineFlow = document.querySelector('#addPolyLineFlow');
+// const addSmooth = document.querySelector('#addSmooth');
+const save = document.querySelector('#save');
+
+// font 12  一字， w: 13 h: 13
+// font 12  两字， w: 25 h: 13
+// font 12  三字， w: 37 h: 13
+// font 12  四字， w: 49 h: 13
+// font 12  五字， w: 61 h: 13
+// font 12  六字， w: 73 h: 13
+
+
+// G6.Global.nodeStyle = {
+//   stroke: '#6392e8',   
+//   fill: '',
+//   lineWidth: 1
+// };
+
+
+// 矩形
+G6.registerNode('customRect', {
+  draw(cfg, group) {
+    // 最后渲染结果会大 1px
+    const w = cfg.size[0] ? cfg.size[0] - 1 : 99;
+    const h = cfg.size[1] ? cfg.size[1] - 1 : 34;
+    const style = cfg.style;
+
+    return group.addShape('rect', {
+      attrs: {
+        x: cfg.x - w / 2,
+        y: cfg.y - h / 2,
+        width: w,
+        height: h,
+        radius: style.radius,
+        fill: style.fill,
+        fillOpacity: style.fillOpacity,
+        fillStyle: style.fillStyle,
+        lineWidth: style.lineWidth,
+        stroke: style.stroke,
+        strokeStyle: style.strokeStyle
+      }
+    });
+  },
+  afterDraw(cfg, group) {
+    const labelStyle = cfg.labelStyle;
+    const textLen = cfg.label && cfg.label.length;
+
+    // - 字体的宽度 / 2
+    // 字体的宽度: 字体大小 * 字体个数 + 1
+    const x = - (labelStyle.size * textLen + 1) / 2
+    // 字体的高 / 2
+    // 字体的高: 字体大小 + 1
+    const y = (labelStyle.size + 1) / 2;
+
+    group.addShape('text', {
+      attrs: {
+        x: x,
+        y: y + 2, // 2px 怀疑是字体初始位置和shape初始位置的间隔
+        fontSize: labelStyle.size,
+        fill: labelStyle.color,
+        text: cfg.label
+      },
+      zIndex: labelStyle.zIndex
+    });
+  },
+  getAnchorPoints() {
+    return [
+      [0, 0.25],
+      [0, 0.5],
+      [0, 0.75],
+      [1, 0.25],
+      [1, 0.5],
+      [1, 0.75],
+      [0.25, 0],
+      [0.5, 0],
+      [0.75, 0],
+      [0.25, 1],
+      [0.5, 1],
+      [0.75, 1]
+    ];
+  }
+}, 'rect');
+// 圆形
+G6.registerNode('customCircle', {
+  draw(cfg, group) {
+    const style = cfg.style;
+
+    return group.addShape('circle', {
+      attrs: {
+        x: cfg.x,
+        y: cfg.y,
+        r: cfg.size,
+        fill: style.fill,
+        fillOpacity: style.fillOpacity,
+        fillStyle: style.fillStyle,
+        lineWidth: style.lineWidth,
+        stroke: style.stroke,
+        strokeStyle: style.strokeStyle
+      }
+    });
+  },
+  afterDraw(cfg, group) {
+    const labelStyle = cfg.labelStyle;
+    const textLen = cfg.label && cfg.label.length;
+
+    // (矩形的宽 - 字体的宽度) / 2
+    // 字体的宽度: 字体大小 * 字体个数 + 1
+    const x = (cfg.size[0] - (labelStyle.size * textLen + 1)) / 2
+    // (矩形的高 + 字体的高) / 2
+    // 字体的高: 字体大小 + 1
+    const y = (cfg.size[1] + (labelStyle.size + 1)) / 2;
+
+    const text = group.addShape('text', {
+      attrs: {
+        x: -12,
+        y: 8,
+        // fontSize: labelStyle.size,
+        fill: labelStyle.color,
+        text: cfg.label
+      },
+      zIndex: labelStyle.zIndex
+    });
+  },
+}, 'circle');
+// 并行（横）
+G6.registerNode('customLineH', {
+  draw(cfg, group) {
+    const w = cfg.size[0];
+    const h = cfg.size[1]
+    const style = cfg.style;
+
+    return group.addShape('rect', {
+      attrs: {
+        x: cfg.x - w / 2,
+        y: cfg.y - h / 2,
+        width: w,
+        height: h,
+        fill: style.fill,
+        fillOpacity: style.fillOpacity,
+        fillStyle: style.fillStyle,
+        lineWidth: style.lineWidth,
+        stroke: style.fill,
+        strokeStyle: style.fillStyle
+      }
+    });
+  },
+  afterDraw(cfg, group) {
+    const style = cfg.style;
+    const w = cfg.size[0];
+    const h = cfg.size[1]
+    const startX = cfg.x - w / 2;
+    const startY = cfg.y - h / 2;
+    const startPath = 'M ' + startX + ' ' + startY;
+    const LPath = 'L ' + (w - w / 2) + ' ' + startY;
+    const startPath2 = 'M ' + startX + ' ' + (h - h / 2);
+    const LPath2 = 'L ' + (w - w / 2) + ' ' + (h - h / 2);
+
+
+    group.addShape('path', {
+      attrs: {
+        path: startPath + LPath + startPath2 + LPath2,
+        lineWidth: style.lineWidth,
+        lineJoin: 'round',
+        stroke: style.stroke
+      },
+      zIndex: 99
+    });
+  },
+  getAnchorPoints() {
+    return [
+      [0, 0.5],
+      [1, 0.5],
+      [0.25, 0],
+      [0.5, 0],
+      [0.75, 0],
+      [0.25, 1],
+      [0.5, 1],
+      [0.75, 1]
+    ];
+  }
+}, 'rect');
+// 并行（竖）
+G6.registerNode('customLineV', {
+  draw(cfg, group) {
+    const w = cfg.size[0];
+    const h = cfg.size[1]
+    const style = cfg.style;
+
+    return group.addShape('rect', {
+      attrs: {
+        x: cfg.x - w / 2,
+        y: cfg.y - h / 2,
+        width: w,
+        height: h,
+        fill: style.fill,
+        fillOpacity: style.fillOpacity,
+        fillStyle: style.fillStyle,
+        lineWidth: style.lineWidth,
+        stroke: style.fill,
+        strokeStyle: style.fillStyle
+      }
+    });
+  },
+  afterDraw(cfg, group) {
+    const style = cfg.style;
+    const w = cfg.size[0];
+    const h = cfg.size[1]
+    const startX = cfg.x - w / 2;
+    const startY = cfg.y - h / 2;
+    const startPath = 'M ' + startX + ' ' + startY;
+    const LPath = 'L ' + startX + ' ' + (h - h / 2);
+    const startPath2 = 'M ' + (w - w / 2) + ' ' + startY;
+    const LPath2 = 'L ' + (w - w / 2) + ' ' + (h - h / 2);
+
+
+    group.addShape('path', {
+      attrs: {
+        path: startPath + LPath + startPath2 + LPath2,
+        lineWidth: style.lineWidth,
+        lineJoin: 'round',
+        stroke: style.stroke
+      },
+      zIndex: 99
+    });
+  },
+  getAnchorPoints() {
+    return [
+      [0, 0.25],
+      [0, 0.5],
+      [0, 0.75],
+      [1, 0.25],
+      [1, 0.5],
+      [1, 0.75],
+      [0.5, 0],
+      [0.5, 1]
+    ];
+  }
+}, 'rect');
+
+
+// 测试
+G6.registerNode('customLine', {
+  draw(cfg, group) {
+    group.addShape('polyline', {
+      attrs: {
+        points: [
+          [-50, 0],
+          [50, 0]
+        ],
+        stroke: cfg.style.stroke
+      }
+    });
+    return group.addShape('polyline', {
+      attrs: {
+        points: [
+          [-50, 12],
+          [50, 12]
+        ],
+        stroke: cfg.style.stroke
+      }
+    });
+  }
+}, 'polyline');
+G6.registerNode('customLine2', {
+  draw(cfg, group) {
+    return group.addShape('path', {
+      attrs: {
+        path: 'M-50 0 L 50 0 M-50 12 L50 12',
+        lineWidth: 1,
+        lineJoin: 'round',
+        stroke: '#54BECC'
+      }
+    });
+  }
+}, 'path');
+
+const Util = G6.Util
+G6.registerNode('customLine3', {
+  getHtml(cfg){
+    console.log(cfg)
+    const dom = Util.createDOM('<div class="customLine3"></div>');
+    console.log(dom)
+    return dom;
+  }
+}, 'html');
+G6.registerNode('customLine4', {
+  getHtml(cfg){
+    console.log(cfg)
+    const model = cfg.model;
+    const dom = Util.createDOM('<div class="customLine4"></div>');
+    console.log(dom)
+    return dom;
+  }
+}, 'html');
+
+
+
+const data = {
+  "nodes": [],
+  "edges": []
+}
+
+// const dagre = new G6.Plugins['layout.dagre']({
+//   rankdir: 'TB',
+//   nodesep: 100,
+//   ranksep: 100,
+//   useEdgeControlPoint: true
+// });
+
+const net = new G6.Net({
+  id: 'mountNode', // 容器ID
+  mode: 'edit',  // 编辑模式
+  fitView: 'cc', // 自适应视口为左上
+  height: 600,    // 画布高
+  // plugins: [dagre]
+});
+
+
+
+
+
+// 矩形
+addCustom1.addEventListener('click', () => {
+  const node = {
+    shape: 'customRect',
+    label: '填写提交流程',
+    labelStyle: {
+      color: 'block',
+      size: 14,
+      zIndex: 99
+    },
+    style: {
+      fill: '#fff',
+      fillOpacity: 1,
+      fillStyle: '#fff',
+      lineWidth: 2,
+      stroke: '#6392e8',
+      strokeStyle: '#6392e8',
+      radius: 35 / 2 // shape 圆角，一般为 height 的一半
+    },
+    size: [100, 35] // width , height
+  }
+  data.nodes.push(node);
+  net.beginAdd('node', node);
+});
+addCustom5.addEventListener('click', () => {
+  const node = {
+    shape: 'customRect',
+    label: '审批操作',
+    labelStyle: {
+      color: 'block',
+      size: 14,
+      zIndex: 99
+    },
+    style: {
+      fill: '#fff',
+      fillOpacity: 1,
+      fillStyle: '#fff',
+      lineWidth: 2,
+      stroke: '#6392e8',
+      strokeStyle: '#6392e8',
+      radius: 0 // shape 圆角，0 表示无圆角
+    },
+    size: [100, 35] // width , height
+  }
+  data.nodes.push(node);
+  net.beginAdd('node', node);
+});
+
+
+// 圆形
+addCustom2.addEventListener('click', () => {
+  const node = {
+    shape: 'customCircle',
+    label: '开始',
+    labelStyle: {
+      color: '#fff',
+      size: 14,
+      zIndex: 99
+    },
+    style: {
+      fill: '#87d067',
+      fillOpacity: 1,
+      fillStyle: '#87d067',
+      lineWidth: 2,
+      stroke: '#87d067',
+      strokeStyle: '#87d067'
+    },
+    size: 20 // cicile R
+  }
+  data.nodes.push(node);
+  net.beginAdd('node', node);
+});
+addCustom4.addEventListener('click', () => {
+  const node = {
+    shape: 'customCircle',
+    label: '结束',
+    labelStyle: {
+      color: '#fff',
+      size: 14,
+      zIndex: 99
+    },
+    style: {
+      fill: '#eb6263',
+      fillOpacity: 1,
+      fillStyle: '#eb6263',
+      lineWidth: 2,
+      stroke: '#eb6263',
+      strokeStyle: '#eb6263'
+    },
+    size: 20 // cicile R
+  }
+  data.nodes.push(node);
+  net.beginAdd('node', node);
+});
+
+
+// 菱形
+addCustom3.addEventListener('click', () => {
+  const node = {
+    shape: 'rhombus',
+    label: '结束',
+    style: {
+      fill: '#fff',
+      fillOpacity: 1,
+      fillStyle: '#fff',
+      lineWidth: 2,
+      stroke: '#6392e8',
+      strokeStyle: '#6392e8'
+    },
+    size: [100, 50]
+  }
+  data.nodes.push(node);
+  net.beginAdd('node', node);
+});
+
+
+// 线（并行）
+addCustom6.addEventListener('click', () => {
+  const node = {
+    shape: 'customLineH',
+    style: {
+      fill: '#fff',
+      fillOpacity: 1,
+      fillStyle: '#fff',
+      lineWidth: 2,
+      stroke: '#6392e8',
+      strokeStyle: '#6392e8'
+    },
+    size: [100, 12]
+  }
+  data.nodes.push(node);
+  net.beginAdd('node', node);
+});
+addCustom7.addEventListener('click', () => {
+  const node = {
+    shape: 'customLineV',
+    style: {
+      fill: '#fff',
+      fillOpacity: 1,
+      fillStyle: '#fff',
+      lineWidth: 2,
+      stroke: '#6392e8',
+      strokeStyle: '#6392e8'
+    },
+    size: [12, 100]
+  }
+  data.nodes.push(node);
+  net.beginAdd('node', node);
+});
+
+// 直线（带箭头）
+addLine.addEventListener('click', () => {
+  const node = {
+    shape: 'arrow',
+    style: {
+      stroke: '#6392e8',
+      lineWidth: 2
+    },
+    label: '测试'
+  }
+  data.nodes.push(node);
+  net.beginAdd('edge', node);
+});
+addLineHV.addEventListener('click', () => {
+  const node = {
+    shape: 'HV',
+    arrow: true,
+    label: '测试'
+  }
+  data.nodes.push(node);
+  net.beginAdd('edge', node);
+});
+addLineVH.addEventListener('click', () => {
+  const node = {
+    shape: 'VH',
+    label: '测试'
+  }
+  data.nodes.push(node);
+  net.beginAdd('edge', node);
+});
+addLineVHV.addEventListener('click', () => {
+  const node = {
+    shape: 'VHV',
+    label: '测试'
+  }
+  data.nodes.push(node);
+  net.beginAdd('edge', node);
+});
+addLineHVH.addEventListener('click', () => {
+  const node = {
+    shape: 'HVH',
+    label: '测试'
+  }
+  data.nodes.push(node);
+  net.beginAdd('edge', node);
+});
+
+// 折线（带箭头）
+addPolyLineFlow.addEventListener('click', function(ev) {
+  const node = {
+    shape: 'polyLineFlow',
+    style: {
+      stroke: '#6392e8',
+      lineWidth: 2
+    },
+    label: '测试'
+  }
+  data.nodes.push(node);
+  net.beginAdd('edge', node);
+});
+
+// addSmooth.addEventListener('click', () => {
+//   const node = {
+//     shape: 'smooth'
+//   }
+//   // data.nodes.push(node);
+//   net.beginAdd('edge', node);
+// });
+
+drag.addEventListener('click', () => {
+  net.changeMode('add');
+});
+
+edit.addEventListener('click', () => {
+  net.changeMode('edit');
+});
+
+
+save.addEventListener('click', () => {
+  const saveData = net.save();
+  const json = JSON.stringify(saveData, null, 2);
+  // console.log(saveData, json); // eslint-disable-line no-console
+
+  const net2 = new G6.Net({
+    id: 'showNode', // 容器ID
+    mode: 'edit',  // 拖曳模式
+    fitView: 'cc', // 自适应视口为左上
+    height: 600,    // 画布高
+    // plugins: [dagre]
+  });
+  const data = saveData.source;
+  console.log(data)
+  net2.source(data.nodes, data.edges)
+  net2.on('itemclick', ev => {
+    console.log(ev.item)
+  });
+  net2.render();
+});
+
+
+// net.on('itemclick', ev => {
+//   console.log(ev)
+//   console.log(ev.item)
+//   console.log(ev.item.get('model').label)
+// });
+
+
+
+
+net.render();
+
+</script>
+</body>
+</html>
